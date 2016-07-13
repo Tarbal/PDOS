@@ -1,0 +1,117 @@
+#!/bin/bash
+
+mkdir PDOS_files
+cd PDOS_files
+mkdir verticle
+mkdir horizontal
+cd ..
+
+fermi=$(gawk '/E-fermi/ {print $3}' OUTCAR)
+nDOS=$(gawk '/NEDOS/ {print $6}' OUTCAR)
+skip=`echo $nDOS+7 | bc`
+skip2=`echo $nDOS+1 | bc`
+gawk -v skipper=$skip 'NR > skipper' DOSCAR_in > ./PDOS_files/PDOS_tempfile1
+gawk -v skipper2=$skip2 'NR%skipper2 != 0 {print $1}' ./PDOS_files/PDOS_tempfile1 > ./PDOS_files/raw_temp_energies1
+gawk -v skipper2=$skip2 'NR%skipper2 != 0 {print $2 " " $3 " " $4 " " $5 " " $6 " " $7 " " $8 " " $9 " " $10 " " $11 " " $12 " " $13 " " $14 " " $15 " " $16 " " $17 " " $18 " " $19}' ./PDOS_files/PDOS_tempfile1 > ./PDOS_files/PDOS_tempfile2
+n_types_of_ATOMS=$(gawk 'NR==6{print NF;exit}' POSCAR)
+echo $n_types_of_ATOMS
+gawk -v range=$nDOS '1; NR == range {exit}' ./PDOS_files/raw_temp_energies1 > ./PDOS_files/raw_temp_energies2
+for eng in `cat ./PDOS_files/raw_temp_energies2` ; do
+	eng_j=`echo $eng - $fermi | bc`
+	echo "$eng_j" >> ./PDOS_files/fermi_subtracted_temp_energies
+done
+
+counter=0
+for (( i = 1; i <= $n_types_of_ATOMS; i++ )); do
+	atom=$(gawk -v atoms1=$i 'FNR == 6 {print $atoms1}' POSCAR)
+	num_atom=$(gawk -v atoms2=$i 'FNR == 7 {print $atoms2}' POSCAR)
+	for ((k = 1; k <= $num_atom; k++)); do
+		line_start=`echo $counter \* $nDOS + 1 | bc`
+		echo $line_start
+		counter=$((counter+1))
+		line_end=`echo $counter \* $nDOS | bc`
+		echo $line_end
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $1} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.s_up
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $2} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.s_down
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $3} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.py_up
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $5} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.pz_up
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $7} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.px_up
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $4} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.py_down
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $6} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.pz_down
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $8} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.px_down
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $9} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.dxy_up
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $11} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.dyz_up
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $13} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.d3z2-r2_up
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $15} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.dxz_up
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $17} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.dx2-y2_up
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $10} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.dxy_down
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $12} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.dyz_down
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $14} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.d3z2-r2_down
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $16} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.dxz_down
+		gawk -v first=$line_start -v last=$line_end 'NR>=first{print $18} NR==last{exit}' ./PDOS_files/PDOS_tempfile2 > ./PDOS_files/$atom.$k.dx2-y2_down
+	done
+done
+
+cd PDOS_files
+
+for (( i = 1; i <= $n_types_of_ATOMS; i++ )); do
+        atom=$(gawk -v atoms1=$i 'FNR == 6 {print $atoms1}' ../POSCAR)
+
+	for n in s_up s_down py_up pz_up px_up py_down pz_down px_down dxy_up dyz_up d3z2-r2_up dxz_up dx2-y2_up dxy_down dyz_down d3z2-r2_down dxz_down dx2-y2_down ; do
+		ls $atom.*.$n &> $atom.$n.file_names_temp
+		paste `cat $atom.$n.file_names_temp` > $atom.$n.columns_temp
+		gawk '{for(zeta=1;zeta<=NF;zeta++) t+=$zeta; print t; t=0}' $atom.$n.columns_temp > $atom.$n
+	done
+
+		paste fermi_subtracted_temp_energies $atom.s_up > ./horizontal/$atom.s_up.dat
+		paste $atom.s_up fermi_subtracted_temp_energies > ./verticle/$atom.s_up.dat
+
+                awk '{$1 *= -1; print}' $atom.s_down > neg_temp
+		paste fermi_subtracted_temp_energies neg_temp > ./horizontal/$atom.s_down.dat
+                paste neg_temp fermi_subtracted_temp_energies > ./verticle/$atom.s_down.dat
+	
+		paste $atom.px_up $atom.py_up $atom.pz_up > columns_temp
+		gawk '{for(zeta=1;zeta<=NF;zeta++) t+=$zeta; print t; t=0}' columns_temp > $atom.p_up
+		paste fermi_subtracted_temp_energies $atom.p_up > ./horizontal/$atom.p_up.dat
+		paste $atom.p_up fermi_subtracted_temp_energies > ./verticle/$atom.p_up.dat
+		
+		paste $atom.px_down $atom.py_down $atom.pz_down > columns_temp
+                gawk '{for(zeta=1;zeta<=NF;zeta++) t+=$zeta; print t; t=0}' columns_temp > $atom.p_down
+		awk '{$1 *= -1; print}' $atom.p_down > neg_temp
+                paste fermi_subtracted_temp_energies neg_temp > ./horizontal/$atom.p_down.dat
+                paste neg_temp fermi_subtracted_temp_energies > ./verticle/$atom.p_down.dat
+
+		paste $atom.dxy_up $atom.dyz_up $atom.dxz_up > columns_temp
+                gawk '{for(zeta=1;zeta<=NF;zeta++) t+=$zeta; print t; t=0}' columns_temp > $atom.t2g_up
+                paste fermi_subtracted_temp_energies $atom.t2g_up > ./horizontal/$atom.t2g_up.dat
+                paste $atom.t2g_up fermi_subtracted_temp_energies > ./verticle/$atom.t2g_up.dat
+
+                paste $atom.dxy_down $atom.dyz_down $atom.dxz_down > columns_temp
+                gawk '{for(zeta=1;zeta<=NF;zeta++) t+=$zeta; print t; t=0}' columns_temp > $atom.t2g_down
+		awk '{$1 *= -1; print}' $atom.t2g_down > neg_temp
+                paste fermi_subtracted_temp_energies neg_temp > ./horizontal/$atom.t2g_down.dat
+                paste neg_temp fermi_subtracted_temp_energies > ./verticle/$atom.t2g_down.dat
+
+                paste $atom.d3z2-r2_up $atom.dx2-y2_up > columns_temp
+                gawk '{for(zeta=1;zeta<=NF;zeta++) t+=$zeta; print t; t=0}' columns_temp > $atom.eg_up
+                paste fermi_subtracted_temp_energies $atom.eg_up > ./horizontal/$atom.eg_up.dat
+                paste $atom.eg_up fermi_subtracted_temp_energies > ./verticle/$atom.eg_up.dat
+
+                paste $atom.d3z2-r2_down $atom.dx2-y2_down > columns_temp
+                gawk '{for(zeta=1;zeta<=NF;zeta++) t+=$zeta; print t; t=0}' columns_temp > $atom.eg_down
+                awk '{$1 *= -1; print}' $atom.eg_down > neg_temp
+                paste fermi_subtracted_temp_energies neg_temp > ./horizontal/$atom.eg_down.dat
+                paste neg_temp fermi_subtracted_temp_energies > ./verticle/$atom.eg_down.dat
+
+		rm $atom.*
+
+done
+
+cd ..
+
+rm ./PDOS_files/*_temp*
+
+# This script works only for collinear spin polarized calculations (i.e. ISPIN = .True. and LSORBIT = .False.)
+# Calculate partial densitiy of states with VASP, copy DOSCAR to a file named DOSCAR_in, and then run this script in the same directory with POSCAR and OUTCAR files.
+# Written by John Petersen johnemilpeterseniii@gmail.com
+
